@@ -124,10 +124,31 @@ private class PushNotificationHandler: NSObject, UNUserNotificationCenterDelegat
     }
 }
 
-/// Injects APNs callback methods into the Tao-generated dynamic AppDelegate class
-/// and sets UNUserNotificationCenter.delegate for foreground notifications.
-/// Must be called on the main thread.
+/// Installs the notification-center delegate, which is what hands this app
+/// foreground notifications and notification taps.
+///
+/// Must run before the app finishes launching: iOS delivers a tap that
+/// launched the app only to the delegate that is already set when launch
+/// completes, and asks exactly once, so a late install drops that tap for
+/// good. Safe to call repeatedly.
+private func installNotificationCenterDelegate() {
+    if let existing = UNUserNotificationCenter.current().delegate,
+        existing is PushNotificationHandler {
+        return
+    }
+    UNUserNotificationCenter.current().delegate = PushNotificationHandler.shared
+    NSLog("[mobile-push] Set UNUserNotificationCenter.delegate")
+}
+
+/// Injects APNs callback methods into the Tao-generated dynamic AppDelegate
+/// class, so registration results reach the waiting `getDeviceToken` call.
+///
+/// Lazily: it needs `UIApplication.shared.delegate`, which Tao creates during
+/// launch, and nothing needs it until a token is requested. Must be called on
+/// the main thread.
 private func setupApnsDelegateInternal() {
+    installNotificationCenterDelegate()
+
     guard !apnsDelegateSetUp else { return }
 
     guard let delegate = UIApplication.shared.delegate else {
@@ -167,10 +188,6 @@ private func setupApnsDelegateInternal() {
     } else {
         NSLog("[mobile-push] didFailToRegisterForRemoteNotifications already exists on AppDelegate")
     }
-
-    // Set UNUserNotificationCenter delegate for foreground handling + tap handling
-    UNUserNotificationCenter.current().delegate = PushNotificationHandler.shared
-    NSLog("[mobile-push] Set UNUserNotificationCenter.delegate")
 
     apnsDelegateSetUp = true
 }
@@ -305,9 +322,20 @@ public class MobilePushPlugin: Plugin {
 
 @_cdecl("init_plugin_mobile_push")
 func initPlugin() -> Plugin {
-    // NOTE: Do NOT call setupApnsDelegateInternal() here.
-    // During plugin init, UIApplication.shared.delegate may not be set yet
-    // (Tao creates it dynamically and we run before didFinishLaunchingWithOptions completes).
-    // The delegate setup happens lazily on the first getDeviceToken call.
+    // Set the notification-center delegate here rather than waiting for the
+    // first `getDeviceToken`. The plugin is registered while the app is being
+    // built, before `UIApplicationMain` runs, so this is the earliest hook
+    // this plugin has — and installing the delegate only on demand is what
+    // loses a tap that launched the app: iOS delivers that response once, to
+    // whichever delegate is set when launch completes, and nothing in a
+    // relaunch that already holds a stored device token ever calls
+    // `getDeviceToken`.
+    //
+    // `setupApnsDelegateInternal` still installs it as well, so a command that
+    // reaches a process where this early install did not stick behaves exactly
+    // as before. The AppDelegate method injection stays lazy there:
+    // `UIApplication.shared.delegate` may not exist yet at this point (Tao
+    // creates the class during launch), and only a token request needs it.
+    installNotificationCenterDelegate()
     return MobilePushPlugin()
 }
