@@ -101,7 +101,7 @@ pub fn clear() {
 ///
 /// Only the mobile platforms produce events, so this is unused (and not
 /// compiled) on the desktop targets.
-#[cfg(any(mobile, test))]
+#[cfg(any(mobile, target_os = "macos", test))]
 pub fn emit(event: &str, payload: &str, sticky: bool) {
     let data: Value = match serde_json::from_str(payload) {
         Ok(data) => data,

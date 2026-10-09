@@ -23,6 +23,13 @@ thiserror = "2"
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["NSData", "NSString"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSApplication", "NSResponder"] }
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["UNUserNotificationCenter", "UNNotification", "UNNotificationRequest", "UNNotificationResponse", "UNNotificationContent", "NSString_UserNotifications", "block2"] }
+block2 = "0.6"
+
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }
 

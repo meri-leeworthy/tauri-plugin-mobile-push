@@ -5,8 +5,10 @@ use tauri::{
 
 pub use models::*;
 
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 mod desktop;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(mobile)]
 mod mobile;
 
@@ -15,6 +17,7 @@ mod error;
 mod events;
 #[cfg(target_os = "ios")]
 mod ios;
+
 mod models;
 
 pub use error::{Error, Result};
@@ -161,7 +164,9 @@ impl Builder {
             .setup(move |app, api| {
                 #[cfg(mobile)]
                 let mobile_push = mobile::init(app, api)?;
-                #[cfg(desktop)]
+                #[cfg(target_os = "macos")]
+                let mobile_push = macos::init(app, api)?;
+                #[cfg(all(desktop, not(target_os = "macos")))]
                 let mobile_push = desktop::init(app, api)?;
                 app.manage(mobile_push);
 
@@ -171,7 +176,9 @@ impl Builder {
                 unsafe {
                     mobile_push_set_foreground_presentation(foreground_bits);
                 }
-                #[cfg(not(target_os = "ios"))]
+                #[cfg(target_os = "macos")]
+                macos::setup(app, foreground_bits);
+                #[cfg(not(any(target_os = "ios", target_os = "macos")))]
                 let _ = foreground_bits;
 
                 Ok(())

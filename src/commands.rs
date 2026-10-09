@@ -75,7 +75,12 @@ pub(crate) async fn request_permission<R: Runtime>(
         })
     }
 
-    #[cfg(desktop)]
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos::request_permission(&app)
+    }
+
+    #[cfg(all(desktop, not(target_os = "macos")))]
     {
         let _ = &app;
         Ok(PermissionResponse { granted: false })
@@ -120,7 +125,12 @@ pub(crate) async fn get_token<R: Runtime>(app: AppHandle<R>) -> Result<TokenResp
         }
     }
 
-    #[cfg(desktop)]
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos::get_token(&app)
+    }
+
+    #[cfg(all(desktop, not(target_os = "macos")))]
     {
         let _ = &app;
         Err(crate::Error::Unsupported)
